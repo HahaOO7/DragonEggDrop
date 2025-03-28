@@ -1,19 +1,18 @@
 package wtf.choco.dragoneggdrop.dragon;
 
 import com.google.common.base.Preconditions;
-
-import java.util.EnumMap;
-import java.util.List;
-import java.util.Map;
-
 import org.bukkit.attribute.Attribute;
 import org.bukkit.boss.BarColor;
 import org.bukkit.boss.BarStyle;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-
 import wtf.choco.dragoneggdrop.dragon.loot.DragonLootTable;
 import wtf.choco.dragoneggdrop.particle.ParticleShapeDefinition;
+
+import java.util.EnumMap;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * A builder class for {@link DragonTemplate} instances.
@@ -160,7 +159,7 @@ public final class DragonTemplateBuilder {
     @NotNull
     public DragonTemplateBuilder attribute(@NotNull Attribute attribute, double value) {
         if (attributes == null) {
-            this.attributes = new EnumMap<>(Attribute.class);
+            this.attributes = new HashMap<>();
         }
 
         this.attributes.put(attribute, value);

@@ -132,7 +132,7 @@ public class RespawnRunnable extends BukkitRunnable {
 
         crystalPos.spawn(world);
         crystalWorld.createExplosion(crystalLocation.getX(), crystalLocation.getY(), crystalLocation.getZ(), 0F, false, false);
-        crystalWorld.spawnParticle(Particle.EXPLOSION_HUGE, crystalLocation, 0);
+        crystalWorld.spawnParticle(Particle.EXPLOSION, crystalLocation, 0);
 
         // All crystals respawned
         if (currentCrystal >= 4) {

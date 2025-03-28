@@ -6,14 +6,13 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 
 import java.io.File;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.EnumMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
+import io.papermc.paper.registry.RegistryAccess;
+import io.papermc.paper.registry.RegistryKey;
 import org.bukkit.ChatColor;
+import org.bukkit.NamespacedKey;
+import org.bukkit.Registry;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.boss.BarColor;
@@ -85,7 +84,7 @@ public final class DragonTemplate implements Registerable {
 
         this.spawnWeight = spawnWeight;
         this.spawnAnnouncement = (spawnAnnouncement != null) ? new ArrayList<>(spawnAnnouncement) : Collections.emptyList();
-        this.attributes = (attributes != null) ? new EnumMap<>(attributes) : Collections.emptyMap();
+        this.attributes = (attributes != null) ? new HashMap<>() : Collections.emptyMap();
     }
 
     @NotNull
@@ -231,8 +230,8 @@ public final class DragonTemplate implements Registerable {
         });
 
         // Set health... max health attribute doesn't do that for me. -,-
-        if (attributes.containsKey(Attribute.GENERIC_MAX_HEALTH)) {
-            dragon.setHealth(attributes.get(Attribute.GENERIC_MAX_HEALTH));
+        if (attributes.containsKey(Attribute.MAX_HEALTH)) {
+            dragon.setHealth(attributes.get(Attribute.MAX_HEALTH));
         }
     }
 
@@ -354,8 +353,9 @@ public final class DragonTemplate implements Registerable {
         ConfigurationSection attributeSection = templateFile.getConfigurationSection(DEDConstants.TEMPLATE_ATTRIBUTES);
         if (attributeSection != null) {
             for (String attributeKey : attributeSection.getValues(false).keySet()) {
-                Optional<@NotNull Attribute> attribute = Enums.getIfPresent(Attribute.class, attributeKey.toUpperCase());
-                if (!attribute.isPresent()) {
+                Attribute attribute = RegistryAccess.registryAccess().getRegistry(RegistryKey.ATTRIBUTE).get(NamespacedKey.minecraft(attributeKey.toLowerCase()));
+
+                if (attribute == null) {
                     plugin.getLogger().warning("Unknown attribute \"" + attributeKey + "\" for template \"" + file.getName() + "\". Ignoring...");
                     continue;
                 }
@@ -366,7 +366,7 @@ public final class DragonTemplate implements Registerable {
                     continue;
                 }
 
-                templateBuilder.attribute(attribute.get(), value);
+                templateBuilder.attribute(attribute, value);
             }
         }
 

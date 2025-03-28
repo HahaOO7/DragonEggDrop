@@ -18,14 +18,10 @@ import java.util.Random;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
-import org.bukkit.Color;
-import org.bukkit.DyeColor;
-import org.bukkit.FireworkEffect;
+import io.papermc.paper.registry.RegistryAccess;
+import io.papermc.paper.registry.RegistryKey;
+import org.bukkit.*;
 import org.bukkit.FireworkEffect.Type;
-import org.bukkit.Material;
-import org.bukkit.NamespacedKey;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeModifier;
 import org.bukkit.attribute.AttributeModifier.Operation;
@@ -36,10 +32,7 @@ import org.bukkit.boss.DragonBattle;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.TropicalFish;
-import org.bukkit.inventory.EquipmentSlot;
-import org.bukkit.inventory.Inventory;
-import org.bukkit.inventory.ItemFlag;
-import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.*;
 import org.bukkit.inventory.meta.BannerMeta;
 import org.bukkit.inventory.meta.BookMeta;
 import org.bukkit.inventory.meta.BookMeta.Generation;
@@ -55,7 +48,6 @@ import org.bukkit.inventory.meta.PotionMeta;
 import org.bukkit.inventory.meta.SkullMeta;
 import org.bukkit.inventory.meta.SuspiciousStewMeta;
 import org.bukkit.inventory.meta.TropicalFishBucketMeta;
-import org.bukkit.potion.PotionData;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.potion.PotionType;
@@ -265,19 +257,10 @@ public final class DragonLootElementItem implements IDragonLootElement {
 
             JsonObject modifiersRoot = modifiersElement.getAsJsonObject();
             for (Entry<String, JsonElement> modifierEntry : modifiersRoot.entrySet()) {
-                Optional<@NotNull Attribute> attribute = Enums.getIfPresent(Attribute.class, modifierEntry.getKey().toUpperCase());
-                if (!attribute.isPresent()) {
-                    throw new JsonParseException("Unexpected attribute modifier key. Given \"" + modifierEntry.getKey() + "\", expected https://hub.spigotmc.org/javadocs/spigot/org/bukkit/attribute/Attribute.html");
-                }
-
-                JsonElement modifierElement = modifierEntry.getValue();
-                if (!modifierElement.isJsonObject()) {
-                    throw new JsonParseException("Element \"" + modifierEntry.getKey() + "\" is of unexpected type. Expected object, got " + modifiersElement.getClass().getSimpleName());
-                }
-
-                JsonObject modifierRoot = modifierElement.getAsJsonObject();
+                Attribute attribute = RegistryAccess.registryAccess().getRegistry(RegistryKey.ATTRIBUTE).get(NamespacedKey.minecraft(modifierEntry.getKey().toLowerCase()));
+                JsonObject modifierRoot = getJsonObject(modifierEntry, attribute, modifiersElement);
                 UUID uuid = modifierRoot.has("uuid") ? UUID.fromString(modifierRoot.get("uuid").getAsString()) : UUID.randomUUID();
-                EquipmentSlot slot = modifierRoot.has("slot") ? Enums.getIfPresent(EquipmentSlot.class, modifierRoot.get("slot").getAsString().toUpperCase()).orNull() : null;
+                EquipmentSlotGroup slot = EquipmentSlotGroup.getByName(modifierRoot.get("slot").getAsString());
 
                 if (!modifierRoot.has("name")) {
                     throw new JsonParseException("Attribute modifier missing element \"name\".");
@@ -296,8 +279,8 @@ public final class DragonLootElementItem implements IDragonLootElement {
                     throw new JsonParseException("Unknown operation for attribute modifier \"" + modifierEntry.getKey() + "\". Expected \"add_number\", \"add_scalar\" or \"multiply_scalar_1\"");
                 }
 
-                AttributeModifier modifier = (slot != null) ? new AttributeModifier(uuid, name, value, operation.get(), slot) : new AttributeModifier(uuid, name, value, operation.get());
-                meta.addAttributeModifier(attribute.get(), modifier);
+                AttributeModifier modifier = (slot != null) ? new AttributeModifier(NamespacedKey.minecraft(name), value, operation.get(), slot) : new AttributeModifier(NamespacedKey.minecraft(name), value, operation.get());
+                meta.addAttributeModifier(attribute, modifier);
             }
         }
 
@@ -340,12 +323,13 @@ public final class DragonLootElementItem implements IDragonLootElement {
                     }
 
                     DyeColor colour = Enums.getIfPresent(DyeColor.class, patternRoot.get("color").getAsString().toUpperCase()).or(DyeColor.WHITE);
-                    Optional<@NotNull PatternType> pattern = Enums.getIfPresent(PatternType.class, patternRoot.get("pattern").getAsString().toUpperCase());
-                    if (!pattern.isPresent()) {
+                    Registry<PatternType> registry = RegistryAccess.registryAccess().getRegistry(RegistryKey.BANNER_PATTERN);
+                    PatternType pattern = registry.get(NamespacedKey.minecraft(patternRoot.get("pattern").getAsString().toLowerCase()));
+                    if (pattern == null) {
                         throw new JsonParseException("Unexpected value for \"pattern\". Given \"" + root.get("pattern").getAsString() + "\", expected https://hub.spigotmc.org/javadocs/spigot/org/bukkit/block/banner/PatternType.html");
                     }
 
-                    metaSpecific.addPattern(new Pattern(colour, pattern.get()));
+                    metaSpecific.addPattern(new Pattern(colour, pattern));
                 }
             }
         }
@@ -571,11 +555,9 @@ public final class DragonLootElementItem implements IDragonLootElement {
         if (meta instanceof PotionMeta) {
             PotionMeta metaSpecific = (PotionMeta) meta;
 
-            PotionType basePotionType = (root.has("base")) ? Enums.getIfPresent(PotionType.class, root.get("base").getAsString().toUpperCase()).or(PotionType.UNCRAFTABLE) : PotionType.UNCRAFTABLE;
-            boolean upgraded = basePotionType.isUpgradeable() && root.has("upgraded") && root.get("upgraded").getAsBoolean();
-            boolean extended = basePotionType.isExtendable() && root.has("extended") && root.get("extended").getAsBoolean();
+            PotionType basePotionType = (root.has("base")) ? Enums.getIfPresent(PotionType.class, root.get("base").getAsString().toUpperCase()).orNull() : null;
 
-            metaSpecific.setBasePotionData(new PotionData(basePotionType, upgraded, extended));
+            metaSpecific.setBasePotionType(basePotionType);
 
             if (root.has("color")) {
                 metaSpecific.setColor(Color.fromRGB(Integer.decode(root.get("color").getAsString())));
@@ -726,6 +708,20 @@ public final class DragonLootElementItem implements IDragonLootElement {
 
         item.setItemMeta(meta);
         return elementBuilder.build(item, weight);
+    }
+
+    private static JsonObject getJsonObject(Entry<String, JsonElement> modifierEntry, Attribute attribute, JsonElement modifiersElement) {
+        if (attribute == null) {
+            throw new JsonParseException("Unexpected attribute modifier key. Given \"" + modifierEntry.getKey() + "\", expected https://hub.spigotmc.org/javadocs/spigot/org/bukkit/attribute/Attribute.html");
+        }
+
+        JsonElement modifierElement = modifierEntry.getValue();
+        if (!modifierElement.isJsonObject()) {
+            throw new JsonParseException("Element \"" + modifierEntry.getKey() + "\" is of unexpected type. Expected object, got " + modifiersElement.getClass().getSimpleName());
+        }
+
+        JsonObject modifierRoot = modifierElement.getAsJsonObject();
+        return modifierRoot;
     }
 
     @NotNull
