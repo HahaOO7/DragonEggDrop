@@ -16,6 +16,16 @@ local.properties
 .recommenders
 .checkstyle
 
+# IntelliJ
+
+.idea/
+
+*.iml
+*.ipr
+*.iws
+
+out/
+
 # External tool builders
 .externalToolBuilders/
 
